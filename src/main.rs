@@ -1,14 +1,15 @@
 use actix_web::{web, App, HttpServer, HttpResponse, Responder};
 use actix_multipart::Multipart;
 use futures_util::stream::StreamExt as _;
-use std::fs::File;
-use std::io::Write;
+use std::fs::{File, create_dir_all};
+use std::io::{Write, BufWriter};
 use uuid::Uuid;
-use image::{DynamicImage, ImageOutputFormat};
+use image::{DynamicImage, ImageOutputFormat, GenericImageView};
 use printpdf::*;
+use std::io::Cursor;
 use env_logger;
 
-/// Converts HEIC to JPG (simulated – real conversion requires native bindings)
+/// Converts HEIC to JPG (simulated)
 async fn convert_heic_to_jpg(mut payload: Multipart) -> impl Responder {
     while let Ok(Some(mut field)) = payload.try_next().await {
         let filename = Uuid::new_v4().to_string() + ".heic";
@@ -21,14 +22,14 @@ async fn convert_heic_to_jpg(mut payload: Multipart) -> impl Responder {
 
         println!("Received and saved HEIC file: {}", filename);
 
-        // Simulate conversion (actual HEIC decoding needs external tools or C bindings)
+        // Simulated conversion
         return HttpResponse::Ok().body("HEIC conversion simulated (real support requires native bindings)");
     }
 
     HttpResponse::BadRequest().body("No file uploaded")
 }
 
-/// Combines JPG/PNG images into a single PDF
+/// Converts multiple images (JPG/PNG) into a single PDF
 async fn convert_images_to_pdf(mut payload: Multipart) -> impl Responder {
     let mut images: Vec<DynamicImage> = Vec::new();
 
@@ -52,29 +53,38 @@ async fn convert_images_to_pdf(mut payload: Multipart) -> impl Responder {
     let (doc, page1, layer1) = PdfDocument::new("Converted PDF", Mm(210.0), Mm(297.0), "Layer 1");
     let current_layer = doc.get_page(page1).get_layer(layer1);
 
-    // Placeholder text (since image drawing in PDF is not implemented here)
-    current_layer.use_text(
-        "PDF created (actual image placement not implemented)",
-        12.0,
-        Mm(10.0),
-        Mm(280.0),
-        &doc.get_font("Helvetica").unwrap(),
-    );
+    // Add each image to the PDF
+    for img in images {
+        let rgb = img.to_rgb8();
+        let (w, h) = rgb.dimensions();
+        let image = Image::from_dynamic_image(&DynamicImage::ImageRgb8(rgb));
 
-    let mut buffer = Vec::new();
-    doc.save(&mut buffer).unwrap();
+        image.add_to_layer(
+            current_layer.clone(),
+            ImageTransform {
+                translate_x: Some(Mm(10.0)),
+                translate_y: Some(Mm(10.0)),
+                scale_x: Some(Mm(w as f64 / 10.0)),
+                scale_y: Some(Mm(h as f64 / 10.0)),
+                rotate: None,
+                dpi: Some(300.0),
+            },
+        );
+    }
+
+    let mut buffer = Cursor::new(Vec::new());
+    doc.save(&mut BufWriter::new(&mut buffer)).unwrap();
+    let pdf_data = buffer.into_inner();
 
     HttpResponse::Ok()
         .content_type("application/pdf")
-        .body(buffer)
+        .body(pdf_data)
 }
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    std::fs::create_dir_all("./tmp").unwrap();
-
-    env_logger::init(); // Optional logger
-
+    create_dir_all("./tmp").unwrap();
+    env_logger::init();
     println!("🚀 Starting server on 0.0.0.0:8080");
 
     HttpServer::new(|| {
@@ -82,7 +92,7 @@ async fn main() -> std::io::Result<()> {
             .route("/convert/heic-to-jpg", web::post().to(convert_heic_to_jpg))
             .route("/convert/image-to-pdf", web::post().to(convert_images_to_pdf))
     })
-    .bind("0.0.0.0:8080")?  // ✅ Required for Render
+    .bind("0.0.0.0:8080")?
     .run()
     .await
 }
