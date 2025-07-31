@@ -1,10 +1,11 @@
 services:
   - type: web
-    name: rust-file-converter
+    name: file-converter
     env: rust
-    plan: free
     buildCommand: cargo build --release
-    startCommand: cargo run
+    startCommand: ./target/release/file-converter
     envVars:
+      - key: PORT
+        value: 8080
       - key: RUST_LOG
         value: info
