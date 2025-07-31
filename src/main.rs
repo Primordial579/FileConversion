@@ -22,7 +22,6 @@ async fn convert_heic_to_jpg(mut payload: Multipart) -> impl Responder {
 
         println!("Received and saved HEIC file: {}", filename);
 
-        // Simulated conversion
         return HttpResponse::Ok().body("HEIC conversion simulated (real support requires native bindings)");
     }
 
@@ -53,21 +52,30 @@ async fn convert_images_to_pdf(mut payload: Multipart) -> impl Responder {
     let (doc, page1, layer1) = PdfDocument::new("Converted PDF", Mm(210.0), Mm(297.0), "Layer 1");
     let current_layer = doc.get_page(page1).get_layer(layer1);
 
-    // Add each image to the PDF
+    let max_width_mm = 180.0;
+    let max_height_mm = 260.0;
+
     for img in images {
         let rgb = img.to_rgb8();
         let (w, h) = rgb.dimensions();
         let image = Image::from_dynamic_image(&DynamicImage::ImageRgb8(rgb));
+
+        let width_mm = w as f64 * 0.264583;
+        let height_mm = h as f64 * 0.264583;
+
+        let scale_x = max_width_mm / width_mm;
+        let scale_y = max_height_mm / height_mm;
+        let scale = scale_x.min(scale_y).min(1.0);  // keep image within page
 
         image.add_to_layer(
             current_layer.clone(),
             ImageTransform {
                 translate_x: Some(Mm(10.0)),
                 translate_y: Some(Mm(10.0)),
-                scale_x: Some(Mm(w as f64 / 10.0)),
-                scale_y: Some(Mm(h as f64 / 10.0)),
+                scale_x: Some(Mm(width_mm * scale)),
+                scale_y: Some(Mm(height_mm * scale)),
                 rotate: None,
-                dpi: Some(300.0),
+                dpi: Some(96.0),
             },
         );
     }
