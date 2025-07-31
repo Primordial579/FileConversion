@@ -1,5 +1,5 @@
 use std::path::Path;
-use std::io::{self, Cursor};
+use std::io::{self, Cursor, Write};
 use actix_web::{
     web, App, Error, HttpResponse, HttpServer, Responder,
     middleware::Logger,
@@ -7,10 +7,10 @@ use actix_web::{
 };
 use actix_multipart::Multipart;
 use futures_util::StreamExt as _;
-use image::{DynamicImage, ImageFormat};
+use image::{ImageFormat, GenericImageView};
 use pdf_writer::{Pdf, Rect, Mm, Page, Content, Finish};
 use tempfile::NamedTempFile;
-use mime_guess::from_ext;
+use mime_guess;
 use serde::Serialize;
 
 #[derive(Serialize)]
@@ -68,7 +68,9 @@ async fn convert_files(mut payload: Multipart) -> Result<HttpResponse, Error> {
 
     match output_format.as_str() {
         "pdf" => {
-            let pdf_bytes = images_to_pdf(&files)?;
+            let pdf_bytes = images_to_pdf(&files).map_err(|e| {
+                actix_web::error::ErrorInternalServerError(e.to_string())
+            })?;
             Ok(HttpResponse::Ok()
                 .content_type("application/pdf")
                 .append_header(ContentDisposition::attachment("converted.pdf"))
@@ -81,9 +83,11 @@ async fn convert_files(mut payload: Multipart) -> Result<HttpResponse, Error> {
                 }));
             }
             let (file, ext) = &files[0];
-            let img_bytes = convert_to_image(file.path(), &ext, &output_format)?;
+            let img_bytes = convert_to_image(file.path(), &ext, &output_format).map_err(|e| {
+                actix_web::error::ErrorInternalServerError(e.to_string())
+            })?;
             Ok(HttpResponse::Ok()
-                .content_type(from_ext(&output_format).first_or_octet_stream())
+                .content_type(mime_guess::from_ext(&output_format).first_or_octet_stream())
                 .append_header(ContentDisposition::attachment(format!("converted.{}", output_format)))
                 .body(img_bytes))
         }
@@ -93,7 +97,7 @@ async fn convert_files(mut payload: Multipart) -> Result<HttpResponse, Error> {
     }
 }
 
-fn convert_to_image(input_path: &Path, input_ext: &str, output_format: &str) -> io::Result<Vec<u8>> {
+fn convert_to_image(input_path: &Path, _input_ext: &str, output_format: &str) -> io::Result<Vec<u8>> {
     let img = image::open(input_path).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
     
     let mut output_bytes = Vec::new();
@@ -115,6 +119,7 @@ fn images_to_pdf(files: &[(NamedTempFile, String)]) -> io::Result<Vec<u8>> {
         let img = image::open(file.path()).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
         let (width, height) = img.dimensions();
         
+        // Convert pixels to millimeters (assuming 300 DPI)
         let width_mm = Mm(width as f32 * 25.4 / 300.0);
         let height_mm = Mm(height as f32 * 25.4 / 300.0);
         
@@ -122,8 +127,11 @@ fn images_to_pdf(files: &[(NamedTempFile, String)]) -> io::Result<Vec<u8>> {
         let mut content = Content::new();
         
         content.save_state();
-        content.transform(width_mm.0, 0.0, 0.0, height_mm.0, 0.0, 0.0);
-        content.text("Image would be embedded here");
+        content.transform([width_mm.0, 0.0, 0.0, height_mm.0, 0.0, 0.0]);
+        content.begin_text();
+        content.set_font("F1", 12.0);
+        content.show_text("Image would be embedded here");
+        content.end_text();
         content.restore_state();
         
         page.contents = content.finish();
