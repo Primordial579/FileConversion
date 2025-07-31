@@ -15,5 +15,5 @@ env_logger = "0.10"
 log = "0.4"
 mime_guess = "2.0"
 
-# Optional: for future-safe font embedding (e.g., with printpdf)
+# Optional: for font loading if you add text in PDF later
 font-loader = "0.11"
