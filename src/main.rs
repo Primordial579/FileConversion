@@ -2,17 +2,17 @@
 
 use actix_web::{web, App, HttpServer, HttpResponse, Responder};
 use actix_multipart::Multipart;
-use futures_util::TryStreamExt;                    // bring try_next into scope
+use futures_util::TryStreamExt;
 use std::fs::{create_dir_all, File};
 use std::io::{BufWriter, Cursor, Write};
 use uuid::Uuid;
 
 // disambiguate the `image` crate
 extern crate image as image_crate;
-use image_crate::{DynamicImage, GenericImageView, load_from_memory};
+use image_crate::{DynamicImage, load_from_memory};
 
 use printpdf::{
-    PdfDocument, ImageXObject, ImageTransform, Mm, Px, ColorSpace, ColorBits
+    PdfDocument, Image as PdfImage, ImageTransform, Mm,
 };
 use env_logger;
 
@@ -53,7 +53,7 @@ async fn convert_images_to_pdf(mut payload: Multipart) -> impl Responder {
     println!("Converting {} image(s) → PDF", images.len());
 
     // A4 portrait
-    let (doc, page1, layer1) = PdfDocument::new("Converted", Mm(210.0), Mm(297.0), "L1");
+    let (doc, page1, layer1) = PdfDocument::new("Converted PDF", Mm(210.0), Mm(297.0), "Layer 1");
     let layer = doc.get_page(page1).get_layer(layer1);
 
     // max printable area in mm
@@ -61,36 +61,27 @@ async fn convert_images_to_pdf(mut payload: Multipart) -> impl Responder {
     let max_h_mm = 260.0;
 
     for img in images {
+        // convert to RGB8 and back into DynamicImage
         let rgb8 = img.to_rgb8();
-        let (px_w, px_h) = rgb8.dimensions();
-        let raw = rgb8.into_raw();
+        let dyn_img = DynamicImage::ImageRgb8(rgb8.clone());
 
-        // convert pixels → mm @96 DPI
+        let (px_w, px_h) = (rgb8.width(), rgb8.height());
         let w_mm = px_w as f64 * 0.264583;
         let h_mm = px_h as f64 * 0.264583;
         let scale = (max_w_mm / w_mm).min(max_h_mm / h_mm).min(1.0);
 
-        // build XObject
-        let xobj = ImageXObject::new(
-            Px(px_w as usize),
-            Px(px_h as usize),
-            ColorSpace::Rgb,
-            ColorBits::Bit8,
-            false,
-            None,
-            None,
-            raw,
-        );
+        // create a PdfImage helper
+        let pdf_img = PdfImage::from_dynamic_image(&dyn_img);
 
-        // place it at (10 mm, 10 mm) from bottom-left, scaled
-        xobj.add_to_layer(
+        // add it to the PDF layer
+        pdf_img.add_to_layer(
             layer.clone(),
             ImageTransform {
                 translate_x: Some(Mm(10.0)),
                 translate_y: Some(Mm(10.0)),
                 rotate: None,
-                scale_x: Some(scale),
-                scale_y: Some(scale),
+                scale_x: Some(Mm(w_mm * scale)),
+                scale_y: Some(Mm(h_mm * scale)),
                 dpi: Some(96.0),
             },
         );
