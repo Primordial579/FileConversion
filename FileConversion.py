@@ -1,8 +1,8 @@
+import os, sys, io, zipfile, threading, warnings
 from flask import Flask, request, send_file
 from flask_cors import CORS
-import os, io, zipfile, threading, warnings
 from PIL import Image, UnidentifiedImageError, ImageFile
-from pillow_heif import register_heif_opener  # <-- Add this line
+from pillow_heif import register_heif_opener
 import fitz  # PyMuPDF
 from werkzeug.utils import secure_filename
 from pdf2docx import Converter
@@ -15,23 +15,42 @@ register_heif_opener()
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 warnings.simplefilter('ignore', Image.DecompressionBombWarning)
 
-app = Flask(__name__)
-CORS(app)
+# ---------- Helper for exe-friendly base path ----------
+def get_app_base():
+    """Return base folder whether running as script or frozen exe."""
+    if getattr(sys, "frozen", False):  # running in PyInstaller bundle
+        return os.path.dirname(sys.executable)
+    return os.path.abspath(os.path.dirname(__file__))
 
-UPLOAD_FOLDER = "uploads"
-CONVERTED_FOLDER = "converted"
+BASE_DIR = get_app_base()
+UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
+CONVERTED_FOLDER = os.path.join(BASE_DIR, "converted")
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(CONVERTED_FOLDER, exist_ok=True)
 
+# ---------- Flask App ----------
+app = Flask(__name__, static_folder=None)
+CORS(app)
+
+# Serve the frontend HTML
+@app.route("/", methods=["GET"])
+def index():
+    html_path = os.path.join(BASE_DIR, "FileConversion.html")
+    return send_file(html_path)
+
+# ---------- Utility ----------
 def clear_folder(path):
     for file in os.listdir(path):
-        os.remove(os.path.join(path, file))
+        try:
+            os.remove(os.path.join(path, file))
+        except Exception:
+            pass
 
+# ---------- Conversion Logic ----------
 def convert_file(conversion_type, filepath, name, ext):
     try:
         if conversion_type == "heic_to_jpg" and ext == ".heic":
-            img = Image.open(filepath)
-            img = img.convert("RGB")
+            img = Image.open(filepath).convert("RGB")
             output_path = os.path.join(CONVERTED_FOLDER, f"{name}.jpg")
             img.save(output_path, "JPEG")
 
@@ -63,7 +82,8 @@ def convert_file(conversion_type, filepath, name, ext):
     except (UnidentifiedImageError, Exception) as e:
         print(f"[ERROR] {filepath}: {e}")
 
-@app.route('/convert', methods=['POST'])
+# ---------- Routes ----------
+@app.route("/convert", methods=["POST"])
 def convert_files():
     clear_folder(UPLOAD_FOLDER)
     clear_folder(CONVERTED_FOLDER)
@@ -79,7 +99,9 @@ def convert_files():
 
         name, ext = os.path.splitext(filename.lower())
 
-        thread = threading.Thread(target=convert_file, args=(conversion_type, filepath, name, ext))
+        thread = threading.Thread(
+            target=convert_file, args=(conversion_type, filepath, name, ext)
+        )
         thread.start()
         threads.append(thread)
 
@@ -94,10 +116,11 @@ def convert_files():
     zip_buffer.seek(0)
     return send_file(
         zip_buffer,
-        mimetype='application/zip',
+        mimetype="application/zip",
         as_attachment=True,
-        download_name='converted_files.zip'
+        download_name="converted_files.zip",
     )
 
-if __name__ == '__main__':
-    app.run(debug=True, threaded=True)
+# ---------- Entry ----------
+if __name__ == "__main__":
+    app.run(host="127.0.0.1", port=5000, debug=False, threaded=True)
