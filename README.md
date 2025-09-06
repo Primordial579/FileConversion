@@ -1,8 +1,23 @@
-# 🧰 File Converter (Localhost)
+# 🧰 File Converter desktop app
 
-A fast and reliable local file converter that supports up to 1500 files in one go. Easily convert HEIC, JPG, PNG, PDF, and Word formats — all through a modern browser interface. The project is in local host to support more than 1000 file conversion.
+A fast and reliable local file converter desktop app that supports up to 1500 files in one go. Easily convert HEIC, JPG, PNG, PDF, and Word formats — all through a modern browser interface.
 
-View Frontend: https://primordial579.github.io/FileConversion/FileConversion.html
+📥 Download
+https://github.com/USERNAME/REPOSITORY/releases/latest/download/FileConvertion.exe
+
+
+When you download and run the .exe for the first time, Windows may show a warning such as:
+
+“Windows protected your PC” or “This file may contain a virus”
+
+This is normal behavior for custom or unsigned applications.
+Since the executable is not signed with a verified publisher certificate, Windows treats it as unrecognized software.
+
+👉 To run the app safely:
+
+1.Click More info.
+2.Select Run anyway.
+
 
 ---
 
