@@ -3,8 +3,13 @@
 A fast and reliable local file converter desktop app that supports up to 1500 files in one go. Easily convert HEIC, JPG, PNG, PDF, and Word formats — all through a modern browser interface.
 
 📥 Download
+
 https://github.com/Primordial579/FileConversion/releases/latest/download/FileConverter.exe
 
+
+(Click the badge above to download the latest release.)
+
+⚠️ Windows SmartScreen Notice
 
 When you download and run the .exe for the first time, Windows may show a warning such as:
 
@@ -15,8 +20,9 @@ Since the executable is not signed with a verified publisher certificate, Window
 
 👉 To run the app safely:
 
-1.Click More info.
-2.Select Run anyway.
+Click More info.
+
+Select Run anyway.
 
 
 ---
