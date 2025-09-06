@@ -43,45 +43,10 @@ Select Run anyway.
 
 ---
 
-## 🛠️ Requirements
-
-- Python 3.7 or higher
-
-### 📦 Install Required Libraries:
-
-```bash
-pip install flask flask-cors pillow pillow-heif pdf2docx docx2pdf PyMuPDF
-```
-
----
-
-## ▶️ Running the App
-
-### 1. Start the Backend
-
-```bash
-python FileConversion.py
-```
-
-### 2. Open the Frontend
-
-Just double-click to open `FileConversion.html` in your browser.
-
-> ⚠️ No need for a frontend server — it's a static HTML file.
-
----
-
-## 📁 Output
-
-After conversion, a **ZIP file** containing all your converted files will be automatically downloaded.
-
----
 
 ## 🧩 Notes
 
-- HEIC support requires the `pillow-heif` plugin (already listed above).
-- File previews are disabled in the frontend to maintain performance for large batches.
-- Fully runs on **localhost**. No external server, API, or cloud usage involved.
+- File previews are disabled in the app to maintain performance for large batches.
 - More than 200 file conversion takes heavy hardware toll
 
 
